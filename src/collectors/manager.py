@@ -1,5 +1,7 @@
 from src.collectors.binance.spot import BinanceSpotWsManager
 from src.collectors.binance.swap import BinanceSwapManager
+from src.collectors.kraken.spot import KrakenSpotWsManager
+from src.collectors.kraken.swap import KrakenSwapManager
 from src.collectors.okx.spot import OkxSpotWsManager
 from src.collectors.okx.swap import OkxSwapManager
 from src.monitoring.pusher import start_metrics_pusher
@@ -12,13 +14,56 @@ import time
 class Manager:
     def __init__(self,exchange_id:str):
         self.exchange_id:str = exchange_id
-        self.mkt_types = ['spot','swap']
-        self.symbols = ['BTC/USDT','ETH/USDT','SOL/USDT','XRP/USDT']
+        self.mkt_types = ["spot","swap"]
+        self.symbols = {
+            "binance":["BTC/USDT","ETH/USDT","SOL/USDT","XRP/USDT"],
+            "kraken":["BTC/USD","ETH/USD"]
+        }
         self._collector_map = {
-            ('binance','spot'):BinanceSpotWsManager,
-            ('okx','spot'):OkxSpotWsManager,
-            ('binance','swap'):BinanceSwapManager,
-            ('okx','swap'):OkxSwapManager,
+            ("binance","spot"):BinanceSpotWsManager,
+            ("okx","spot"):OkxSpotWsManager,
+            ("kraken","spot"):KrakenSpotWsManager,
+            ("binance","swap"):BinanceSwapManager,
+            ("okx","swap"):OkxSwapManager,
+            ("kraken","swap"):KrakenSwapManager,
+        }
+
+        self.COLLECTOR_TASKS = {
+            ("binance", "spot"): [
+                ("watch_order_book", "orderbook"),
+                ("watch_trades", "trades"),
+            ],
+            ("binance", "swap"): [
+                ("watch_order_book", "orderbook"),
+                ("watch_trades", "trades"),
+                ("watch_mark_price", "mark_price"),
+            ],
+            ("kraken", "spot"): [
+                ("watch_order_book", "orderbook"),
+                ("watch_trades", "trades"),
+            ],
+            ("kraken", "swap"): [
+                ("watch_order_book", "orderbook"),
+                ("watch_trades", "trades"),
+                ("watch_ticker", "ticker"),
+            ],
+            ("okx", "swap"): [
+                ("watch_order_book", "orderbook"),
+                ("watch_trades", "trades"),
+                ("watch_mark_price", "mark_price"),
+                ("watch_funding_rate", "funding_rate"),
+            ],
+        }
+
+        self.independence_tasks = {
+            ("binance", "swap"): [
+                ("watch_liquidations", ()),
+                ("fetch_open_interest", (30,)),
+            ],
+            ("okx", "swap"): [
+                ("fetch_open_interest", (30,)),
+                ("watch_liquidations", ()),
+            ]
         }
 
     async def main(self):
@@ -37,19 +82,43 @@ class Manager:
                 # Do not abort the whole process on startup connection failure.
                 # watch_loop and the periodic swap tasks will keep retrying.
                 controller.logger.error(f"initial connect failed, background tasks will retry: {e}")
+
+            collector_tasks = self.COLLECTOR_TASKS.get((self.exchange_id,mkt_type), [])
+            independence_tasks = self.independence_tasks.get((self.exchange_id,mkt_type), [])
                     
-            for symbol in self.symbols:
-                if mkt_type == 'spot':
-                    tasks.append(asyncio.create_task(controller.watch_loop(symbol, 'watch_order_book','orderbook')))
-                    tasks.append(asyncio.create_task(controller.watch_loop(symbol, 'watch_trades','trades')))
-                if mkt_type == 'swap':
-                    tasks.append(asyncio.create_task(controller.watch_loop(symbol, 'watch_order_book','orderbook')))
-                    tasks.append(asyncio.create_task(controller.watch_loop(symbol, 'watch_trades','trades')))
-                    tasks.append(asyncio.create_task(controller.watch_loop(symbol, 'watch_mark_price','mark_price')))
-                    tasks.append(asyncio.create_task(controller.fetch_open_interest(symbol,30)))
-                    tasks.append(asyncio.create_task(controller.watch_liquidations(symbol)))
-                    if self.exchange_id == 'okx':
-                        tasks.append(asyncio.create_task(controller.watch_loop(symbol, 'watch_funding_rate','funding_rate')))
+            for symbol in self.symbols[self.exchange_id]:
+                for watch_name,data_type in collector_tasks:
+                    method_name = f"_handle_{data_type}"
+                    method = getattr(controller,method_name,None)
+
+                    if method is None:
+                        raise RuntimeError(
+                            f"{self.exchange_id}/{mkt_type} missing method: {method_name}"
+                        )
+
+                    tasks.append(asyncio.create_task(controller.watch_loop(symbol,watch_name,data_type)))
+
+                for method_name,args in independence_tasks:
+                    method = getattr(controller,method_name,None)
+
+                    if method is None:
+                        raise RuntimeError(
+                            f"{self.exchange_id}/{mkt_type} missing method: {method_name}"
+                        )
+
+                    tasks.append(asyncio.create_task(method(symbol,*args)))
+
+                # if mkt_type == 'spot':
+                #     tasks.append(asyncio.create_task(controller.watch_loop(symbol, 'watch_order_book','orderbook')))
+                #     tasks.append(asyncio.create_task(controller.watch_loop(symbol, 'watch_trades','trades')))
+                # if mkt_type == 'swap':
+                #     tasks.append(asyncio.create_task(controller.watch_loop(symbol, 'watch_order_book','orderbook')))
+                #     tasks.append(asyncio.create_task(controller.watch_loop(symbol, 'watch_trades','trades')))
+                #     tasks.append(asyncio.create_task(controller.watch_loop(symbol, 'watch_mark_price','mark_price')))
+                #     tasks.append(asyncio.create_task(controller.fetch_open_interest(symbol,30)))
+                #     tasks.append(asyncio.create_task(controller.watch_liquidations(symbol)))
+                #     # if self.exchange_id == 'okx':
+                #     #     tasks.append(asyncio.create_task(controller.watch_loop(symbol, 'watch_funding_rate','funding_rate')))
 
             tasks.append(asyncio.create_task(controller.route()))
                    

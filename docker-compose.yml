@@ -37,10 +37,12 @@ services:
         max-size: "50m"
         max-file: "3"
 
-  executor-binance:
-    build: .
-    container_name: executor-binance
-    # restart: always
+  collector-kraken:
+    build: 
+      context: .
+      target: final
+    container_name: collector-kraken
+    restart: always
     env_file:
       - .env
     volumes:
@@ -48,13 +50,18 @@ services:
       - ./logs:/app/logs
       - ./src:/app/src
     environment:
-      - EXCHANGE=binance
+      - EXCHANGE=kraken
       - PYTHONPATH=/app
-    command: python -m src.executor.real_time_executor
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health', timeout=5).read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 256M
         reservations:
           memory: 256M
     depends_on:
@@ -67,6 +74,37 @@ services:
       options:
         max-size: "50m"
         max-file: "3"
+
+  # executor-binance:
+  #   build: .
+  #   container_name: executor-binance
+  #   # restart: always
+  #   env_file:
+  #     - .env
+  #   volumes:
+  #     - ./data:/app/data
+  #     - ./logs:/app/logs
+  #     - ./src:/app/src
+  #   environment:
+  #     - EXCHANGE=binance
+  #     - PYTHONPATH=/app
+  #   command: python -m src.executor.real_time_executor
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 512M
+  #       reservations:
+  #         memory: 256M
+  #   depends_on:
+  #     quant-redis:
+  #       condition: service_healthy
+  #     clickhouse:
+  #       condition: service_healthy
+  #   logging:
+  #     driver: json-file
+  #     options:
+  #       max-size: "50m"
+  #       max-file: "3"
 
   # collector-okx:
   #   build: 

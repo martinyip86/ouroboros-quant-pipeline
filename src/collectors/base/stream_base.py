@@ -27,6 +27,7 @@ class StreamBase(ABC):
             'watch_trades':60,
             'watch_mark_price':120,
             'watch_funding_rate':600,
+            "watch_ticker":60,
         }
 
     @abstractmethod
@@ -145,19 +146,23 @@ class StreamBase(ABC):
                 msg = await self.queue.get()
                 
                 data_type = msg['type']
-                if data_type == 'orderbook':
-                    await self._handle_orderbook(msg['symbol'],msg['data'])
-                elif data_type == 'trades':
-                    await self._handle_trades(msg['symbol'],msg['data'])
-                elif data_type == 'mark_price':
-                    await self._handle_market_price(msg['symbol'],msg['data'])
-                elif data_type == 'funding_rate':
-                    await self._handle_funding_rate(msg['symbol'],msg['data'])
+                handler_name = f"_handle_{data_type}"
+                handler = getattr(self,handler_name,None)
 
-                self.queue.task_done()
+                if handler is None:
+                    self.logger.warning(
+                        f"Unknown data type: {data_type}, "
+                        f"handler {handler_name} does not exist"
+                    )
+                    continue
+
+                await handler(msg['symbol'],msg['data'])
+
             except Exception as e:
                 self.logger.error(f"route have error: {e}")
                 await asyncio.sleep(0.1)
+            finally:
+                self.queue.task_done()
 
     async def start_health_check(self,port=8080):
 

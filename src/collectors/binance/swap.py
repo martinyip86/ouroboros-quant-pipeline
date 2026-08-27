@@ -1,5 +1,5 @@
 from src.collectors.base.stream_base import StreamBase
-from src.models.schema import TradeDataForSwap,MarketPriceData,OpenInterestData,FundingRateData,OrderbookForSwap,LiquidationsData
+from src.models.schema import TradeDataForSwap,MarkPriceData,OpenInterestData,FundingRateData,OrderbookForSwap,LiquidationsData
 import ccxt.pro as ccxt_pro
 import asyncio
 import time
@@ -75,7 +75,8 @@ class BinanceSwapManager(StreamBase):
                             exchange_id=self.exchange_id,
                             symbol=symbol,
                             mkt_type=self.mkt_type,
-                            trade_id=int(trade_dict['id']),
+                            trade_id=str(trade_dict['id']),
+                            trade_sequece=None,
                             timestamp=ts,
                             side=trade_dict['side'],
                             price=trade_dict['price'],
@@ -86,9 +87,9 @@ class BinanceSwapManager(StreamBase):
         except Exception as e:
             self.logger.error(f"swap trades add redis error: {e}")
 
-    async def _handle_market_price(self,symbol:str,data):
-        stream_key_mp = f"md:{self.exchange_id}:{self.mkt_type}:{symbol.replace('/','-')}:market_price"
-        registry_mp = f"registry:streams:market_price"
+    async def _handle_mark_price(self,symbol:str,data):
+        stream_key_mp = f"md:{self.exchange_id}:{self.mkt_type}:{symbol.replace('/','-')}:mark_price"
+        registry_mp = f"registry:streams:mark_price"
         await self.register_stream_once(registry_mp,stream_key_mp)
         stream_key_fr = f"md:{self.exchange_id}:{self.mkt_type}:{symbol.replace('/','-')}:funding_rate"
         registry_fr = f"registry:streams:funding_rate"
@@ -98,7 +99,7 @@ class BinanceSwapManager(StreamBase):
                 info = data.get('info')
                 raw_ts = data.get('timestamp')
                 ts = raw_ts if raw_ts is not None else int(time.time() * 1000)
-                marketPriceData = MarketPriceData(
+                marketPriceData = MarkPriceData(
                     exchange_id=self.exchange_id,
                     symbol=symbol,
                     mkt_type=self.mkt_type,

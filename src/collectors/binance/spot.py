@@ -75,9 +75,6 @@ class BinanceSpotWsManager(StreamBase):
             async with self.redis.pipeline(transaction=False) as pipe:
                 for trade_dict in trades:
                     info = trade_dict.get('info', {})
-                    is_m = info.get('m', str(info.get('isBuyerMaker', '')).lower() == 'true')
-                    is_m_bool = str(is_m).lower() == 'true'
-                    is_taker_buyer = not is_m_bool
                     raw_ts = trade_dict.get('timestamp')
                     ts = raw_ts if raw_ts is not None else int(time.time() * 1000)
                     trade = TradeData(
@@ -85,12 +82,10 @@ class BinanceSpotWsManager(StreamBase):
                         symbol=symbol,
                         mkt_type=self.mkt_type,
                         trade_id=int(trade_dict['id']),
-                        trade_id_raw=str(trade_dict['id']),
                         timestamp=ts,
                         side=trade_dict['side'],
                         price=trade_dict['price'],
-                        amount=trade_dict['amount'],
-                        is_taker_buyer=is_taker_buyer
+                        amount=trade_dict['amount']
                     )
                     
                     await pipe.xadd(stream_key,{'data':trade.model_dump_json()},maxlen=10000,approximate=True)

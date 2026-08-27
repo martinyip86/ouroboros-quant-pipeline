@@ -23,12 +23,10 @@ class TradeData(BaseModel):
     symbol:str = Field(...,description="Instrument symbol")
     mkt_type:str = Field(...,description="Market segment (spot/swap/future)")
     trade_id:int = Field(...,description="Unique execution ID from exchange by String Int")
-    trade_id_raw:str = Field(...,description="Unique execution ID from exchange by String")
     timestamp:int = Field(...,description="Matching engine execution timestamp (ms)")
     side:str = Field(...,description="Execution direction (buy/sell)")
     price:float = Field(...,description="Execution price")
     amount:float = Field(...,description="Execution quantity")
-    is_taker_buyer:bool = Field(...,description="Directional intent: True=Taker Buy (Bullish), False=Taker Sell (Bearish)")
     local_timestamp:int = Field(default_factory=lambda: int(datetime.now().timestamp() * 1000))
 
 class OrderbookForSwap(BaseModel):
@@ -47,14 +45,15 @@ class TradeDataForSwap(BaseModel):
     exchange_id:str = Field(...,description="Bxchange identifier (e.g., Binance, OKX)")
     symbol:str = Field(...,description="Instrument symbol")
     mkt_type:str = Field(...,description="Market segment (spot/swap/future)")
-    trade_id:int = Field(...,description="Unique execution ID from exchange by String Int")
+    trade_id:str = Field(...,description="Unique execution ID from exchange by String")
+    trade_sequece:int | None = Field(...,description="trade sequece By Int")
     timestamp:int = Field(...,description="Matching engine execution timestamp (ms)")
     side:str = Field(...,description="Execution direction (buy/sell)")
     price:float = Field(...,description="Execution price")
     amount:float = Field(...,description="Execution quantity")
     local_timestamp:int = Field(default_factory=lambda: int(datetime.now().timestamp() * 1000))
 
-class MarketPriceData(BaseModel):
+class MarkPriceData(BaseModel):
     exchange_id:str = Field(...,description="Bxchange identifier (e.g., Binance, OKX)")
     symbol:str = Field(...,description="Instrument symbol")
     mkt_type:str = Field(...,description="Market segment (spot/swap/future)")

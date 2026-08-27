@@ -3,18 +3,29 @@ import asyncio
 import polars as pl
 
 async def main():
-    symbol = 'ETH/USDT:USDT'
-    exchange = ccxt_pro.binanceusdm({
-        'enableRateLimit':True,
-        'options':{
-            'defaultType':'swap'
-        }
-    })
-    # await exchange.load_markets()
+    symbol = "BTC/USD"
+    # exchange = ccxt_pro.krakenfutures({
+    #     "enableRateLimit":True,
+    #     "newUpdates":True,
+    # })
+    exchange = ccxt_pro.kraken({
+            "enableRateLimit":True,
+            "newUpdates":True,
+        })
+    await exchange.load_markets()
 
-    data = await exchange.watch_liquidations(symbol)
-    print(data)
+    try:
+        # data = await exchange.watch_ticker(symbol)
+        # for key,value in data.items():
+        #     print(f"[{key}]:{value}")
 
+        data = await exchange.watch_trades(symbol)
+        print(data[0])
+    except Exception as e:
+        print(f"error: {e}")
+    finally:
+        await exchange.close()
+    
     # orderbook = await exchange.watch_order_book(symbol)
     # print(orderbook.keys())
 
@@ -33,10 +44,6 @@ async def main():
     #     funding_rate = await asyncio.wait_for(exchange.watch_funding_rate(symbol),timeout=60)
     #     print("funding rate")
     #     print(funding_rate)
-
-    await exchange.close()
-    
-
 
 if __name__ == '__main__':
     asyncio.run(main())

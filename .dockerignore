@@ -26,3 +26,5 @@ docker-compose.yml
 /deploy/grafana/grafana_data/**
 /deploy/prometheus/prometheus_data/
 /deploy/prometheus/prometheus_data/**
+
+/temp

@@ -12,29 +12,53 @@ def generate_taker_features(
     ) -> pl.LazyFrame:
     # 1. 聚合现货 Trade 数据（以 50ms 或者是对齐盘口时间戳为基准）
     # 这里演示按盘口时间戳就近拼接或者滚动聚合
-    spot_trades_df_1s = _trades_ofi(df_trades_spot,ts=1000).rename({
-        "signed_turnover": "spot_trade_flow_1s",
-        "signed_amount": "spot_trade_amount_1s",
-        "turnover": "spot_trade_turnover_1s",
-        "trade_count": "spot_trade_count_1s",
+    # spot_trades_df_1s = _trades_ofi(df_trades_spot,ts=1000).rename({
+    #     "signed_turnover": "spot_trade_flow_1s",
+    #     "signed_amount": "spot_trade_amount_1s",
+    #     "turnover": "spot_trade_turnover_1s",
+    #     "trade_count": "spot_trade_count_1s",
+    # })
+    # spot_trades_df_2s = _trades_ofi(df_trades_spot,ts=2000).rename({
+    #     "signed_turnover": "spot_trade_flow_2s",
+    #     "signed_amount": "spot_trade_amount_2s",
+    #     "turnover": "spot_trade_turnover_2s",
+    #     "trade_count": "spot_trade_count_2s",
+    # })
+    # swap_trades_df_1s = _trades_ofi(df_trades_swap,ts=1000).rename({
+    #     "signed_turnover": "swap_trade_flow_1s",
+    #     "signed_amount": "swap_trade_amount_1s",
+    #     "turnover": "swap_trade_turnover_1s",
+    #     "trade_count": "swap_trade_count_1s",
+    # })
+    # swap_trades_df_2s = _trades_ofi(df_trades_swap,ts=2000).rename({
+    #     "signed_turnover": "swap_trade_flow_2s",
+    #     "signed_amount": "swap_trade_amount_2s",
+    #     "turnover": "swap_trade_turnover_2s",
+    #     "trade_count": "swap_trade_count_2s",
+    # })
+    swap_trades_df_10s = _trades_ofi(df_trades_swap,ts=10000).rename({
+        "signed_turnover": "swap_trade_flow_10s",
+        "signed_amount": "swap_trade_amount_10s",
+        "turnover": "swap_trade_turnover_10s",
+        "trade_count": "swap_trade_count_10s",
     })
-    spot_trades_df_2s = _trades_ofi(df_trades_spot,ts=2000).rename({
-        "signed_turnover": "spot_trade_flow_2s",
-        "signed_amount": "spot_trade_amount_2s",
-        "turnover": "spot_trade_turnover_2s",
-        "trade_count": "spot_trade_count_2s",
+    swap_trades_df_30s = _trades_ofi(df_trades_swap,ts=30000).rename({
+        "signed_turnover": "swap_trade_flow_30s",
+        "signed_amount": "swap_trade_amount_30s",
+        "turnover": "swap_trade_turnover_30s",
+        "trade_count": "swap_trade_count_30s",
     })
-    swap_trades_df_1s = _trades_ofi(df_trades_swap,ts=1000).rename({
-        "signed_turnover": "swap_trade_flow_1s",
-        "signed_amount": "swap_trade_amount_1s",
-        "turnover": "swap_trade_turnover_1s",
-        "trade_count": "swap_trade_count_1s",
+    swap_trades_df_60s = _trades_ofi(df_trades_swap,ts=60000).rename({
+        "signed_turnover": "swap_trade_flow_60s",
+        "signed_amount": "swap_trade_amount_60s",
+        "turnover": "swap_trade_turnover_60s",
+        "trade_count": "swap_trade_count_60s",
     })
-    swap_trades_df_2s = _trades_ofi(df_trades_swap,ts=2000).rename({
-        "signed_turnover": "swap_trade_flow_2s",
-        "signed_amount": "swap_trade_amount_2s",
-        "turnover": "swap_trade_turnover_2s",
-        "trade_count": "swap_trade_count_2s",
+    swap_trades_df_120s = _trades_ofi(df_trades_swap,ts=120000).rename({
+        "signed_turnover": "swap_trade_flow_120s",
+        "signed_amount": "swap_trade_amount_120s",
+        "turnover": "swap_trade_turnover_120s",
+        "trade_count": "swap_trade_count_120s",
     })
     spot_ob_df_1s = _orderbook_ofi(df_orderbook_spot,'spot',ts=1000).rename({
         "ofi":"spot_ob_ofi_1s"
@@ -48,52 +72,108 @@ def generate_taker_features(
     swap_ob_df_2s = _orderbook_ofi(df_orderbook_swap,'swap',ts=2000).rename({
         "ofi":"swap_ob_ofi_2s"
     })
-    
-    df_features = df_orderbook_swap.sort('timestamp').join_asof(
-        df_orderbook_spot.sort('timestamp'),
-        on='timestamp',
-        strategy='backward'
-    ).join_asof(
-        spot_ob_df_1s.sort('timestamp'),
-        on="timestamp",
-        strategy="backward"
-    ).join_asof(
-        spot_ob_df_2s.sort('timestamp'),
-        on="timestamp",
-        strategy="backward"
-    ).join_asof(
-        swap_ob_df_1s.sort('timestamp'),
-        on="timestamp",
-        strategy="backward"
-    ).join_asof(
-        swap_ob_df_2s.sort('timestamp'),
-        on="timestamp",
-        strategy="backward"
-    ).join_asof(
-        spot_trades_df_1s.sort('timestamp'),
-        on='timestamp',
-        strategy='backward'
-    ).join_asof(
-        spot_trades_df_2s.sort('timestamp'),
-        on='timestamp',
-        strategy='backward'
-    ).join_asof(
-        swap_trades_df_1s.sort('timestamp'),
-        on='timestamp',
-        strategy='backward'
-    ).join_asof(
-        swap_trades_df_2s.sort('timestamp'),
-        on='timestamp',
-        strategy='backward'
-    ).join_asof(
-        df_mark_price.sort('timestamp'),
-        on='timestamp',
-        strategy='backward'
-    ).join_asof(
-        df_open_interest.sort('timestamp'),
-        on='timestamp',
-        strategy='backward'
+    swap_ob_df_10s = _orderbook_ofi(df_orderbook_swap,'swap',ts=10000).rename({
+        "ofi":"swap_ob_ofi_10s"
+    })
+    swap_ob_df_30s = _orderbook_ofi(df_orderbook_swap,'swap',ts=30000).rename({
+        "ofi":"swap_ob_ofi_30s"
+    })
+    swap_ob_df_60s = _orderbook_ofi(df_orderbook_swap,'swap',ts=60000).rename({
+        "ofi":"swap_ob_ofi_60s"
+    })
+    swap_ob_df_120s = _orderbook_ofi(df_orderbook_swap,'swap',ts=120000).rename({
+        "ofi":"swap_ob_ofi_120s"
+    })
+    df_features = (
+        df_orderbook_swap.sort('timestamp').join_asof(
+            df_orderbook_spot.sort('timestamp'),
+            on='timestamp',
+            strategy='backward'
+        ).join_asof(
+            spot_ob_df_1s.sort('timestamp'),
+            on="timestamp",
+            strategy="backward"
+        ).join_asof(
+            spot_ob_df_2s.sort('timestamp'),
+            on="timestamp",
+            strategy="backward"
+        ).join_asof(
+            swap_ob_df_1s.sort('timestamp'),
+            on="timestamp",
+            strategy="backward"
+        ).join_asof(
+            swap_ob_df_2s.sort('timestamp'),
+            on="timestamp",
+            strategy="backward"
+        )
+        # .join_asof(
+        #     spot_trades_df_1s.sort('timestamp'),
+        #     on='timestamp',
+        #     strategy='backward'
+        # )
+        # .join_asof(
+        #     spot_trades_df_2s.sort('timestamp'),
+        #     on='timestamp',
+        #     strategy='backward'
+        # )
+        # .join_asof(
+        #     swap_trades_df_1s.sort('timestamp'),
+        #     on='timestamp',
+        #     strategy='backward'
+        # )
+        # .join_asof(
+        #     swap_trades_df_2s.sort('timestamp'),
+        #     on='timestamp',
+        #     strategy='backward'
+        # )
+        .join_asof(
+            swap_trades_df_10s.sort("timestamp"),
+            on="timestamp",
+            strategy="backward"
+        ).join_asof(
+            swap_trades_df_30s.sort("timestamp"),
+            on="timestamp",
+            strategy="backward"
+        ).join_asof(
+            swap_trades_df_60s.sort("timestamp"),
+            on="timestamp",
+            strategy="backward"
+        ).join_asof(
+            swap_trades_df_120s.sort("timestamp"),
+            on="timestamp",
+            strategy="backward"
+        ).join_asof(
+            swap_ob_df_10s.sort("timestamp"),
+            on="timestamp",
+            strategy="backward"
+        ).join_asof(
+            swap_ob_df_30s.sort("timestamp"),
+            on="timestamp",
+            strategy="backward"
+        ).join_asof(
+            swap_ob_df_60s.sort("timestamp"),
+            on="timestamp",
+            strategy="backward"
+        ).join_asof(
+            swap_ob_df_120s.sort("timestamp"),
+            on="timestamp",
+            strategy="backward"
+        ).join_asof(
+            df_mark_price.sort('timestamp'),
+            on='timestamp',
+            strategy='backward'
+        ).join_asof(
+            df_open_interest.sort('timestamp'),
+            on='timestamp',
+            strategy='backward'
+        )
     )
+    df_features = df_features.with_columns([
+        (pl.col("swap_trade_count_10s") / 10).alias("swap_trade_count_rate_10s"),
+        (pl.col("swap_trade_count_120s") / 120).alias("swap_trade_count_rate_120s")
+    ]).with_columns([
+        (pl.col("swap_trade_count_rate_10s") / (pl.col("swap_trade_count_rate_120s") + 1e-8)).alias("trade_count_acceleration")
+    ])
     # 计算obi深度 5，10，20depth
     df_features = df_features.with_columns([
         _calculate_obi("swap",1),
@@ -137,14 +217,35 @@ def generate_taker_features(
         "abs_return_bps_5m",
         "abs_return_bps_15m",
         "abs_return_bps_60m",
-        "spot_trade_flow_1s",
-        "spot_trade_flow_2s",
-        "swap_trade_flow_1s",
-        "swap_trade_flow_2s",
-        "spot_ob_ofi_1s",
-        "spot_ob_ofi_2s",
-        "swap_ob_ofi_1s",
-        "swap_ob_ofi_2s",
+        # "spot_trade_flow_1s",
+        # "spot_trade_flow_2s",
+        # "swap_trade_flow_1s",
+        # "swap_trade_flow_2s",
+        "swap_trade_flow_10s",
+        "swap_trade_flow_30s",
+        "swap_trade_flow_60s",
+        "swap_trade_flow_120s",
+        # "swap_trade_turnover_1s",
+        # "swap_trade_count_1s",
+        # "swap_trade_turnover_2s",
+        # "swap_trade_count_2s",
+        "swap_trade_turnover_10s",
+        "swap_trade_count_10s",
+        "swap_trade_turnover_30s",
+        "swap_trade_count_30s",
+        "swap_trade_turnover_60s",
+        "swap_trade_count_60s",
+        "swap_trade_turnover_120s",
+        "swap_trade_count_120s",
+        "trade_count_acceleration",
+        # "spot_ob_ofi_1s",
+        # "spot_ob_ofi_2s",
+        # "swap_ob_ofi_1s",
+        # "swap_ob_ofi_2s",
+        "swap_ob_ofi_10s",
+        "swap_ob_ofi_30s",
+        "swap_ob_ofi_60s",
+        "swap_ob_ofi_120s",
         "swap_obi_l5",
         "swap_obi_l1",
         "spot_obi_l5",
