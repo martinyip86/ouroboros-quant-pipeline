@@ -76,7 +76,7 @@ class BinanceSwapManager(StreamBase):
                             symbol=symbol,
                             mkt_type=self.mkt_type,
                             trade_id=str(trade_dict['id']),
-                            trade_sequece=None,
+                            trade_sequece=0,
                             timestamp=ts,
                             side=trade_dict['side'],
                             price=trade_dict['price'],
