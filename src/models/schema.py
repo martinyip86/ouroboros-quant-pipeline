@@ -46,7 +46,7 @@ class TradeDataForSwap(BaseModel):
     symbol:str = Field(...,description="Instrument symbol")
     mkt_type:str = Field(...,description="Market segment (spot/swap/future)")
     trade_id:str = Field(...,description="Unique execution ID from exchange by String")
-    trade_sequece:int | None = Field(...,description="trade sequece By Int")
+    trade_sequence:int | None = Field(...,description="trade sequence By Int")
     timestamp:int = Field(...,description="Matching engine execution timestamp (ms)")
     side:str = Field(...,description="Execution direction (buy/sell)")
     price:float = Field(...,description="Execution price")

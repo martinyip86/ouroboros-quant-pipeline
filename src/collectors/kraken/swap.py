@@ -80,13 +80,13 @@ class KrakenSwapManager(StreamBase):
                     if trade_dict["price"] > 0 and trade_dict["amount"] > 0:
                         raw_ts = trade_dict.get("timestamp")
                         ts = raw_ts if raw_ts is not None else int(time.time() * 1000)
-                        trade_sequece = trade_dict.get("info",{}).get("seq")
+                        trade_sequence = trade_dict.get("info",{}).get("seq")
                         trade = TradeDataForSwap(
                             exchange_id=self.exchange_id,
                             symbol=symbol,
                             mkt_type=self.mkt_type,
                             trade_id=str(trade_dict["id"]),
-                            trade_sequece=trade_sequece,
+                            trade_sequence=trade_sequence,
                             timestamp=ts,
                             side=trade_dict["side"],
                             price=trade_dict["price"],
