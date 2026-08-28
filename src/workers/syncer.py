@@ -149,7 +149,19 @@ class Syncer:
                 )
                 
                 duration = time.time()-start_time
-                self.logger.info(f"🚢 [FLUSH] Table: {table} | Rows: {len(df)} | binance: {len(df.filter(pl.col('exchange_id')=='binance'))} | okx: {len(df.filter(pl.col('exchange_id')=='okx'))} | Latency: {duration:.3f}s")
+                exchange_count = df.group_by("exchange_id").agg(pl.len().alias("rows")).sort("exchange_id")
+
+                exchange_summary = " | ".join(
+                    f"{row["exchange_id"]}: {row["rows"]}"
+                    for row in exchange_count.to_dicts()
+                )
+
+                self.logger.info(
+                    f"🚢 [FLUSH] Table: {table} "
+                    f"| Rows: {len(df)} "
+                    f"{exchange_summary} "
+                    f"| Latency: {duration:.3f}s"
+                )
 
                 if duration > self.flush_interval * 0.8:
                     self.logger.warning(f"⚠️ [PRESSURE] DB write latency is nearing limit for {table}!")
