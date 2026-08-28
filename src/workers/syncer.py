@@ -159,7 +159,7 @@ class Syncer:
                 self.logger.info(
                     f"🚢 [FLUSH] Table: {table} "
                     f"| Rows: {len(df)} "
-                    f"{exchange_summary} "
+                    f"| {exchange_summary} "
                     f"| Latency: {duration:.3f}s"
                 )
 

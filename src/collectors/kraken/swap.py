@@ -33,6 +33,9 @@ class KrakenSwapManager(StreamBase):
                         }
                     }
                 })
+
+                self.ws.load_markets()
+
                 await asyncio.sleep(0.01)
                 self.logger.info("✅ [SUCCESS] Connection established.")
 

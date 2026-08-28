@@ -7,14 +7,15 @@ import os
 import zipfile
 import io
 import time
+from logging import Logger
 
 class BasePatcher:
-    def __init__(self,exchange_id:str,symbol:str,target_date:str,logger):
+    def __init__(self,exchange_id:str,symbol:str,target_date:str,logger:Logger):
         if target_date is None or target_date >= datetime.now(timezone.utc).strftime('%Y-%m-%d'):
-            if exchange_id == 'binance':
-                self.target_date = (datetime.now(timezone.utc) - timedelta(days=1)).strftime('%Y-%m-%d')
-            elif exchange_id == 'okx':
+            if exchange_id == "okx":
                 self.target_date = (datetime.now(timezone.utc) - timedelta(days=2)).strftime('%Y-%m-%d')
+            else:
+                self.target_date = (datetime.now(timezone.utc) - timedelta(days=1)).strftime('%Y-%m-%d')
         else:
             self.target_date = target_date
 
@@ -56,12 +57,11 @@ class BasePatcher:
             f"{table}.parquet"
         )
         os.makedirs(os.path.dirname(file_path),exist_ok=True)
-        if not os.path.exists(file_path):
-            tmp_path = f"{file_path}.tmp"
-            df.write_parquet(tmp_path)
-            os.replace(tmp_path,file_path)
-            size_mb = os.path.getsize(file_path) / (1024 * 1024)
-            self.logger.info(f"✨ Export successful: {file_path} | Size: {size_mb:.2f}MB")
+        tmp_path = f"{file_path}.tmp"
+        df.write_parquet(tmp_path)
+        os.replace(tmp_path,file_path)
+        size_mb = os.path.getsize(file_path) / (1024 * 1024)
+        self.logger.info(f"✨ Export successful: {file_path} | Size: {size_mb:.2f}MB")
         
     def sync_to_clickhouse(self,df:pl.DataFrame,table:str):
         chunk_size = 5000

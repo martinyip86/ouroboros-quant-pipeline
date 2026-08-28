@@ -1,13 +1,15 @@
 *.csv
 *.parquet
 *.png
+*.md
 
 .gitignore
 .dockerignore
 .vscode
 .git
+.env.example
 
-log
+logs
 data
 __pycache__
 Dockerfile

@@ -36,15 +36,16 @@ class TradesSpotPatcher(BasePatcher):
                     pl.lit(symbol).alias('symbol'),
                     pl.lit(mkt_type).alias('mkt_type'),
                     pl.col('trade_id').cast(pl.Int64),
-                    pl.col('trade_id').cast(pl.String).alias('trade_id_raw'),
                     pl.col('price').cast(pl.Float64),
                     pl.col('amount').cast(pl.Float64),
+                    pl.when(pl.col("is_maker") == False)
+                    .then(pl.lit("buy"))
+                    .otherwise(pl.lit("sell"))
+                    .alias("side"),
                     pl.when(pl.col('timestamp').cast(pl.String).str.len_chars() == 16).then(pl.col('timestamp').cast(pl.Int64) // 1000).otherwise(pl.col('timestamp').cast(pl.Int64)).alias('timestamp'),
-                    pl.when(pl.col('is_maker') == False).then(pl.lit('buy')).otherwise(pl.lit('sell')).alias('side'),
-                    pl.col('is_maker').not_().alias('is_taker_buyer'),
                     pl.lit(int(time.time() * 1000)).alias('local_timestamp')
                 ],
-                'select':['trade_id','trade_id_raw','exchange_id','symbol','mkt_type','price','amount','timestamp','side','is_taker_buyer','local_timestamp']
+                'select':['trade_id','exchange_id','symbol','mkt_type','price','amount','timestamp','side','local_timestamp']
             },
             'okx':{
                 'header':["symbol","trade_id","amount","price","size","timestamp"],
@@ -53,15 +54,13 @@ class TradesSpotPatcher(BasePatcher):
                     pl.lit(symbol).alias('symbol'),
                     pl.lit(mkt_type).alias('mkt_type'),
                     pl.col('trade_id').cast(pl.Int64),
-                    pl.col('trade_id').cast(pl.String).alias('trade_id_raw'),
                     pl.col('price').cast(pl.Float64),
                     pl.col('size').cast(pl.Float64).alias('amount'),
                     pl.col("created_time").cast(pl.Int64).alias('timestamp'),
                     pl.col('side'),
-                    (pl.col('side') == 'buy').alias('is_taker_buyer'),
                     pl.lit(int(time.time() * 1000)).alias('local_timestamp')
                 ],
-                'select':['trade_id','trade_id_raw','exchange_id','symbol','mkt_type','price','amount','timestamp','side','is_taker_buyer','local_timestamp']
+                'select':['trade_id','exchange_id','symbol','mkt_type','price','amount','timestamp','side','local_timestamp']
             }
         }
         target_col = columns[exchange_id]
@@ -103,7 +102,6 @@ class TradesSpotPatcher(BasePatcher):
                     round(price,8) as price,
                     round(amount,8) as amount,
                     side,
-                    is_taker_buyer,
                     timestamp
                 FROM
                     trades_spot
@@ -117,7 +115,7 @@ class TradesSpotPatcher(BasePatcher):
                 'max_memory_usage': '1G',       # 限制服务器使用的总内存
                 'preferred_block_size_bytes': '1048576',
             }
-            column_names = ['trade_id','price','amount','side','is_taker_buyer','timestamp']
+            column_names = ['trade_id','price','amount','side','timestamp']
             chunks = []
             with self.ch.query_column_block_stream(sql,settings=settings) as stream:
                 for block in stream:

@@ -51,7 +51,7 @@ class MarkPriceSwapPatcher(BasePatcher):
     
     def _get_ch_data(self,exchange_id:str,symbol:str,max_timestamp,min_timestamp) -> pl.LazyFrame:
         sql = f"""
-            SELECT timestamp FROM market_data.market_price_swap
+            SELECT timestamp FROM market_data.mark_price_swap
             WHERE timestamp BETWEEN {min_timestamp} AND {max_timestamp}
                 AND exchange_id='{exchange_id}'
                 AND symbol='{symbol}'
@@ -87,7 +87,7 @@ class MarkPriceSwapPatcher(BasePatcher):
                 if not gaps_df.is_empty():
                     try:
                         # self.sync_to_clickhouse(gaps_df,'market_price_swap')
-                        self.export_parquet(gaps_df,'market_price_swap')
+                        self.export_parquet(gaps_df,'mark_price_swap')
                         self.logger.info(f"✅ [PATCHED] Injected {len(gaps_df)} missing records into {self.exchange_id} {self.symbol}.")
                         # partition_id = self.target_date.replace('-','')
                         # sql = f"OPTIMIZE TABLE market_data.market_price_swap PARTITION {partition_id} FINAL"

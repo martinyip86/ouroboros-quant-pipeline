@@ -1,6 +1,8 @@
 from src.workers.trades_spot_patcher import TradesSpotPatcher
 from src.workers.trades_swap_patcher import TradesSwapPatcher
 from src.workers.mark_price_swap_patcher import MarkPriceSwapPatcher
+from src.workers.kraken_trades_spot_patcher import KrakenTradesSpotPatcher
+from src.workers.kraken_trades_swap_patcher import KrakenTradesSwapPatcher
 from src.utils.logger import setup_logger
 
 from dotenv import load_dotenv
@@ -15,11 +17,14 @@ load_dotenv()
 class DailyPatcher:
     def __init__(self,target_date:str=None):
         self.target_date = target_date
-        self.exchange_ids = ['binance']
-        self.symbols = ['BTC/USDT','ETH/USDT','SOL/USDT','XRP/USDT']
+        self.exchange_ids = ["binance","kraken"]
+        self.symbols = {
+            "binance":["BTC/USDT","ETH/USDT","SOL/USDT","XRP/USDT"],
+            "kraken":["BTC/USD","ETH/USD"]
+        }
         self.logger = setup_logger(
-            name='daily.patcher',
-            log_file='logs/workers/daily_patcher.log'
+            name="daily.patcher",
+            log_file="logs/workers/daily_patcher.log"
         )
 
     def connect_ssh(self):
@@ -46,7 +51,7 @@ class DailyPatcher:
 
     def upload_to_server(self,exchange_id:str,target_date:str,symbol:str):
         if target_date is None or target_date >= datetime.now(timezone.utc).strftime('%Y-%m-%d'):
-            if exchange_id == 'binance':
+            if exchange_id != "okx":
                 target_date = (datetime.now(timezone.utc) - timedelta(days=1)).strftime('%Y-%m-%d')
 
         clear_symbol = symbol.replace('/','-')
@@ -99,6 +104,9 @@ class DailyPatcher:
                     f"rm -f {remote_path}"
                 )
 
+                if os.path.exists(local_path):
+                    os.remove(local_path)
+
                 uploaded_files.append(remote_path)
 
         except Exception as e:
@@ -111,13 +119,21 @@ class DailyPatcher:
 
     def main(self):
         for exchange_id in self.exchange_ids:
-            for symbol in self.symbols:
-                TradesSpotPatcher(exchange_id,symbol,self.target_date,self.logger).main()
-                time.sleep(5)
-                TradesSwapPatcher(exchange_id,symbol,self.target_date,self.logger).main()
-                time.sleep(5)
-                MarkPriceSwapPatcher(exchange_id,symbol,self.target_date,self.logger).main()
-                time.sleep(5)
+            symbols = self.symbols[exchange_id]
+            for symbol in symbols:
+                if exchange_id == "kraken":
+                    KrakenTradesSpotPatcher(exchange_id,symbol,self.target_date,self.logger).main()
+                    time.sleep(5)
+                    KrakenTradesSwapPatcher(exchange_id,symbol,self.target_date,self.logger).main()
+                    time.sleep(5)
+                else:
+                    TradesSpotPatcher(exchange_id,symbol,self.target_date,self.logger).main()
+                    time.sleep(5)
+                    TradesSwapPatcher(exchange_id,symbol,self.target_date,self.logger).main()
+                    time.sleep(5)
+                    MarkPriceSwapPatcher(exchange_id,symbol,self.target_date,self.logger).main()
+                    time.sleep(5)
+
                 self.upload_to_server(exchange_id,self.target_date,symbol)
 
 if __name__ == '__main__':

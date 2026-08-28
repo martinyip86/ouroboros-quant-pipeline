@@ -5,28 +5,92 @@ import os
 import gc
 import time
 from datetime import datetime,timedelta,timezone
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 class Consolidator:
     def __init__(self):
         self.logger = setup_logger("workers.consolidator")
-        self.exchange_ids = ['binance']
-        self.symbols = ['BTC/USDT','ETH/USDT','SOL/USDT','XRP/USDT']
-        self.ch = ch_manager.connect('hk')
+        self.exchange_ids = ["binance","kraken"]
+        self.symbols = {
+            "binance": ["BTC/USDT","ETH/USDT","SOL/USDT","XRP/USDT"],
+            "kraken": ["BTC/USD","ETH/USD"]
+        }
+        self.ch = ch_manager.connect("hk")
         self.processed_path = "data/processed"
 
     def _generate_filepath(self,exchange_id:str,symbol:str,mkt_type:str,watch_type:str,target_date:str):
-        clear_symbol = symbol.replace('/','-')
+        clear_symbol = symbol.replace("/","-")
         file_path = os.path.join(
             self.processed_path,
             exchange_id,
             mkt_type,
             clear_symbol,
             watch_type,
-            f"{target_date.replace('-','')}.parquet"
+            f"{target_date.replace("-","")}.parquet"
         )
         os.makedirs(os.path.dirname(file_path),exist_ok=True)
         return file_path
 
+    def _stream_query_to_parquet(self,sql:str,file_path:str,settings:dict,transform=None,overwrite:bool=False) -> int:
+        if os.path.exists(file_path) and not overwrite:
+            self.logger.info(f"⏭️ File already exists: {file_path}")
+            return 0
+
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+        tmp_path = f"{file_path}.tmp"
+        writer = None
+        total_rows = 0
+
+        with self.ch.query_arrow_stream(sql,settings=settings,use_strings=True) as stream:
+            for arrow_table in stream:
+                if arrow_table.num_rows == 0:
+                    continue
+
+                if transform is not None:
+                    arrow_table = transform(arrow_table)
+
+                if arrow_table.num_rows == 0:
+                    continue
+
+                if writer is None:
+                    writer = pq.ParquetWriter(
+                        tmp_path,
+                        arrow_table.schema,
+                        compression="zstd",
+                        compression_level=3,
+                        use_dictionary=True,
+                        write_statistics=True,
+                    )
+
+                writer.write_table(arrow_table,row_group_size=100_000)
+
+                total_rows += arrow_table.num_rows
+
+                self.logger.info(
+                    f"📦 Streaming export: "
+                    f"{file_path} | Rows: {total_rows}"
+                )
+
+        if writer is None:
+            self.logger.warning(f"⚠️ [NO-DATA] {file_path}")
+            return 0
+
+        writer.close()
+        writer = None
+
+        os.replace(tmp_path, file_path)
+
+        size_mb = os.path.getsize(file_path) / (1024 * 1024)
+
+        self.logger.info(
+            f"✨ Export successful: {file_path} "
+            f"| Rows: {total_rows} "
+            f"| Size: {size_mb:.2f}MB"
+        )
+
+        return total_rows
 
     def _export_orderbook_spot(self,exchange_id:str,symbol:str,target_date:str):
         file_path = self._generate_filepath(exchange_id,symbol,'spot','orderbook',target_date)
@@ -177,7 +241,6 @@ class Consolidator:
                     price,
                     amount,
                     side,
-                    is_taker_buyer,
                     timestamp
                 FROM market_data.trades_spot
                 WHERE exchange_id='{exchange_id}'
@@ -193,7 +256,8 @@ class Consolidator:
                 'max_memory_usage': '1G',       # 限制服务器使用的总内存
                 'preferred_block_size_bytes': '1048576',
             }
-            column_names = ['trade_id','price','amount','side','is_taker_buyer','timestamp']
+            
+            column_names = ['trade_id','price','amount','side','timestamp']
             chunks = []
             with self.ch.query_column_block_stream(sql,settings=settings) as stream:
                 for block in stream:
@@ -278,7 +342,7 @@ class Consolidator:
                     mark_price,
                     index_price,
                     timestamp
-                FROM market_data.market_price_swap
+                FROM market_data.mark_price_swap
                 WHERE exchange_id='{exchange_id}'
                     AND symbol='{symbol}'
                     AND timestamp >= {start_ts}
@@ -457,15 +521,17 @@ class Consolidator:
         self.logger.info("generate summary files are starting now...")
         for exchange_id in self.exchange_ids:
             if target_date is None or target_date >= datetime.now(timezone.utc).strftime('%Y-%m-%d'):
-                if exchange_id == 'binance':
+                if exchange_id == "okx":
+                    current_target_date = (datetime.now(timezone.utc) - timedelta(days=2)).strftime('%Y-%m-%d')             
+                else:
                     current_target_date = (datetime.now(timezone.utc) - timedelta(days=1)).strftime('%Y-%m-%d')
-                elif exchange_id == 'okx':
-                    current_target_date = (datetime.now(timezone.utc) - timedelta(days=2)).strftime('%Y-%m-%d')
             else:
                 current_target_date = target_date
 
             print(current_target_date)
-            for symbol in self.symbols:
+
+            symbols = self.symbols[exchange_id]
+            for symbol in symbols:
                 self._export_orderbook_spot(exchange_id,symbol,current_target_date)
                 self._export_orderbook_swap(exchange_id,symbol,current_target_date)
                 self._export_trades_spot(exchange_id,symbol,current_target_date)

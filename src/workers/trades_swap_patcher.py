@@ -2,6 +2,7 @@ from src.workers.base_patcher import BasePatcher
 import polars as pl
 import os
 import time
+from datetime import datetime,timezone,timedelta
 
 class TradesSwapPatcher(BasePatcher):
     def __init__(self,exchange_id:str,symbol:str,target_date:str,logger):
@@ -35,7 +36,7 @@ class TradesSwapPatcher(BasePatcher):
                     pl.lit(exchange_id).alias('exchange_id'),
                     pl.lit(symbol).alias('symbol'),
                     pl.lit(mkt_type).alias('mkt_type'),
-                    pl.col('id').cast(pl.Int64).alias('trade_id'),
+                    pl.col('id').cast(pl.String).alias('trade_id'),
                     pl.col('price').cast(pl.Float64),
                     pl.col('qty').cast(pl.Float64).alias('amount'),
                     pl.when(pl.col('time').cast(pl.String).str.len_chars() == 16).then(pl.col('time').cast(pl.Int64) // 1000).otherwise(pl.col('time').cast(pl.Int64)).alias('timestamp'),
@@ -50,7 +51,7 @@ class TradesSwapPatcher(BasePatcher):
                     pl.lit(exchange_id).alias('exchange_id'),
                     pl.lit(symbol).alias('symbol'),
                     pl.lit(mkt_type).alias('mkt_type'),
-                    pl.col('trade_id').cast(pl.Int64),
+                    pl.col('trade_id').cast(pl.String),
                     pl.col('price').cast(pl.Float64),
                     pl.col('size').cast(pl.Float64).alias('amount'),
                     pl.col("created_time").cast(pl.Int64).alias('timestamp'),
@@ -64,10 +65,14 @@ class TradesSwapPatcher(BasePatcher):
         schema = target_col['select']
         return pl.scan_csv(file_path).with_columns(clear_columns).select(schema).filter((pl.col('price') > 0) & (pl.col('amount') > 0))
     
-    def _get_ch_data(self,exchange_id:str,symbol:str,max_trade_id,min_trade_id) -> pl.LazyFrame:
+    def _get_ch_data(self,exchange_id:str,symbol:str,target_date:str) -> pl.LazyFrame:
+        star_dt = datetime.strptime(target_date,"%Y-%m-%d").replace(tzinfo=timezone.utc)
+        start_ms = int(star_dt.timestamp() * 1000)
+        end_ms = int((star_dt + timedelta(days=1)).timestamp() * 1000)
+
         sql = f"""
             SELECT trade_id FROM market_data.trades_swap
-            WHERE trade_id BETWEEN {min_trade_id} AND {max_trade_id}
+            WHERE timestamp BETWEEN {start_ms} AND {end_ms}
                 AND exchange_id='{exchange_id}'
                 AND symbol='{symbol}'
             ORDER BY trade_id ASC
@@ -143,13 +148,8 @@ class TradesSwapPatcher(BasePatcher):
         exists_ok = self._download_csv(self.exchange_id,self.mkt_type,url,file_path)
         if exists_ok and os.path.exists(file_path):
             official_lf = self._clear_data(self.exchange_id,self.mkt_type,self.symbol,file_path)
-            stats = official_lf.select([
-                pl.col('trade_id').max().alias('max_id'),
-                pl.col('trade_id').min().alias('min_id')
-            ]).collect(streaming=True)
-            max_trade_id = stats['max_id'][0]
-            min_trade_id = stats['min_id'][0]
-            ch_lf = self._get_ch_data(self.exchange_id,self.symbol,max_trade_id,min_trade_id)
+
+            ch_lf = self._get_ch_data(self.exchange_id,self.symbol,self.target_date)
             gaps_df = pl.DataFrame()
             if not ch_lf.collect().is_empty():
                 gap_lf = official_lf.join(ch_lf,on='trade_id',how='anti')
